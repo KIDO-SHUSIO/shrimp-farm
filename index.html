@@ -6,47 +6,205 @@
     <title>Shrimp Farm Online Control</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js" type="text/javascript"></script>
     <style>
-        :root { --primary: #1a73e8; --danger: #d93025; --success: #28a745; }
-        body { font-family: 'Kanit', sans-serif; background: #f0f2f5; margin: 0; padding: 20px; display: flex; justify-content: center; }
-        .card { background: white; width: 100%; max-width: 450px; padding: 25px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
-        h1 { color: #202124; font-size: 1.5rem; margin-bottom: 5px; }
-        #status-label { font-size: 0.85rem; color: #5f6368; margin-bottom: 20px; }
-        
-        .display-section { background: #e8f0fe; padding: 20px; border-radius: 15px; margin-bottom: 25px; }
-        .temp-val { font-size: 4rem; font-weight: bold; color: var(--danger); line-height: 1; margin: 10px 0; }
-        .relay-status { font-weight: bold; font-size: 1.1rem; }
+        /* --- CSS ส่วนที่แก้ไขเพื่อความสวยงาม --- */
+        :root {
+            --primary: #3498db;     /* สีน้ำเงินฟ้า Modern */
+            --danger: #e74c3c;      /* สีแดง Soft */
+            --success: #2ecc71;     /* สีเขียว Soft */
+            --bg-body: #f4f7f6;     /* สีพื้นหลังนุ่มนวล */
+            --bg-card: #ffffff;     /* สีพื้นหลัง Card */
+            --text-main: #2c3e50;  /* สีตัวอักษรหลัก */
+            --text-sub: #7f8c8d;   /* สีตัวอักษรรอง */
+            --shadow: 0 10px 25px rgba(0,0,0,0.05); /* เงาบางๆ */
+        }
 
-        .control-section { text-align: left; border-top: 1px solid #eee; padding-top: 20px; }
-        label { display: block; font-size: 0.9rem; color: #3c4043; margin-bottom: 5px; font-weight: 500; }
-        input { width: 100%; padding: 12px; margin-bottom: 15px; border: 1px solid #dadce0; border-radius: 8px; font-size: 1rem; box-sizing: border-box; }
-        
-        button { background: var(--primary); color: white; border: none; padding: 15px; width: 100%; border-radius: 10px; font-size: 1.1rem; font-weight: bold; cursor: pointer; transition: 0.2s; }
-        button:hover { background: #1557b0; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        button:active { transform: scale(0.98); }
+        body {
+            font-family: 'Kanit', sans-serif;
+            background: var(--bg-body);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center; /* จัดกึ่งกลางแนวตั้งด้วย */
+            min-height: 100vh;   /* เต็มความสูงหน้าจอ */
+        }
+
+        .card {
+            background: var(--bg-card);
+            width: 100%;
+            max-width: 420px;       /* ปรับขนาดเล็กน้อย */
+            padding: 30px;          /* เพิ่ม padding */
+            border-radius: 24px;    /* โค้งมนมากขึ้น */
+            box-shadow: var(--shadow);
+            transition: transform 0.3s ease; /* เพิ่มเอฟเฟกต์เมื่อ Hover */
+        }
+
+        .card:hover {
+            transform: translateY(-5px); /* ยกลอยเล็กน้อย */
+        }
+
+        h1 {
+            color: var(--text-main);
+            font-size: 1.6rem;
+            margin-top: 0;
+            margin-bottom: 8px;
+            font-weight: 500;
+            text-align: center; /* จัดกึ่งกลางหัวข้อ */
+        }
+
+        #status-label {
+            font-size: 0.9rem;
+            color: var(--text-sub);
+            margin-bottom: 25px;
+            text-align: center; /* จัดกึ่งกลางสถานะ */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 5px; /* เว้นระยะห่างไอคอน (ถ้ามี) */
+        }
+
+        /* ส่วนแสดงผล (Display) */
+        .display-section {
+            background: #eaf2f8; /* สีฟ้าอ่อนนุ่ม */
+            padding: 25px;
+            border-radius: 18px;
+            margin-bottom: 25px;
+            text-align: center; /* จัดกึ่งกลาง */
+            border: 1px solid #d6eaf8; /* เส้นขอบบางๆ */
+        }
+
+        .display-title {
+            font-size: 0.95rem;
+            color: var(--text-sub);
+            text-transform: uppercase; /* ตัวพิมพ์ใหญ่ */
+            letter-spacing: 1px;       /* เว้นระยะตัวอักษร */
+            margin-bottom: 5px;
+        }
+
+        .temp-val {
+            font-size: 4.5rem; /* ใหญ่โดดเด่น */
+            font-weight: 500;   /* ลดความหนาเล็กน้อย */
+            color: var(--danger);
+            line-height: 1;
+            margin: 15px 0;
+            display: flex;
+            justify-content: center;
+            align-items: baseline;
+        }
+
+        .temp-unit {
+            font-size: 1.8rem;
+            margin-left: 5px;
+            font-weight: 300;
+            color: var(--text-sub);
+        }
+
+        .relay-status {
+            font-weight: 500;
+            font-size: 1.1rem;
+            margin-top: 10px;
+            background: rgba(255,255,255,0.7); /* พื้นหลังจางๆ */
+            padding: 8px 15px;
+            border-radius: 20px;
+            display: inline-block; /* ให้พื้นหลังพอดีตัวอักษร */
+        }
+
+        /* ส่วนควบคุม (Control) */
+        .control-section {
+            text-align: left;
+            border-top: 1px solid #eee;
+            padding-top: 25px;
+        }
+
+        .control-group {
+            margin-bottom: 18px; /* จัดกลุ่ม input */
+        }
+
+        label {
+            display: block;
+            font-size: 0.9rem;
+            color: var(--text-main);
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+
+        input {
+            width: 100%;
+            padding: 14px; /* เพิ่มพื้นที่ */
+            border: 1px solid #dcdde1;
+            border-radius: 12px;   /* โค้งมน */
+            font-size: 1rem;
+            box-sizing: border-box;
+            background: #fcfcfc;
+            transition: border-color 0.2s, box-shadow 0.2s;
+            font-family: 'Kanit', sans-serif;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: var(--primary); /* เปลี่ยนสีเมื่อ Focus */
+            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.15); /* แสงเรือง */
+        }
+
+        button {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 16px;
+            width: 100%;
+            border-radius: 12px;
+            font-size: 1.1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: 0.3s ease;
+            box-shadow: 0 4px 15px rgba(52, 152, 219, 0.3); /* เงาของปุ่ม */
+            font-family: 'Kanit', sans-serif;
+            margin-top: 10px;
+        }
+
+        button:hover {
+            background: #2980b9;
+            box-shadow: 0 6px 20px rgba(52, 152, 219, 0.4);
+            transform: translateY(-2px);
+        }
+
+        button:active {
+            transform: translateY(1px);
+            box-shadow: 0 2px 10px rgba(52, 152, 219, 0.3);
+        }
     </style>
-    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500&display=swap" rel="stylesheet">
 </head>
 <body>
 
 <div class="card">
-    <h1>ระบบควบคุมบ่อกุ้ง (Online)</h1>
-    <div id="status-label">กำลังเชื่อมต่อ Server...</div>
+    <h1>ระบบควบคุมบ่อกุ้ง</h1>
+    <div id="status-label"><span>⏳</span> กำลังเชื่อมต่อ Server...</div>
 
     <div class="display-section">
-        <div style="font-size: 0.9rem; color: #5f6368;">อุณหภูมิในน้ำ</div>
-        <div class="temp-val"><span id="temp">--.-</span><span style="font-size: 1.5rem;">°C</span></div>
+        <div class="display-title">อุณหภูมิในน้ำ</div>
+        <div class="temp-val">
+            <span id="temp">--.-</span>
+            <span class="temp-unit">°C</span>
+        </div>
         <div class="relay-status">สถานะรีเลย์: <span id="relay">รอข้อมูล...</span></div>
     </div>
 
     <div class="control-section">
-        <label>อุณหภูมิที่ต้องการให้เปิด (>=)</label>
-        <input type="number" id="targetTemp" step="0.1" value="32.0">
+        <div class="control-group">
+            <label for="targetTemp">อุณหภูมิที่ต้องการให้เปิด (>=)</label>
+            <input type="number" id="targetTemp" step="0.1" value="32.0" placeholder="เช่น 32.0">
+        </div>
 
-        <label>เวลาเริ่มเปิดใช้งาน</label>
-        <input type="time" id="startTime" value="22:00">
+        <div class="control-group">
+            <label for="startTime">เวลาเริ่มเปิดใช้งาน</label>
+            <input type="time" id="startTime" value="22:00">
+        </div>
 
-        <label>เวลาเริ่มปิดใช้งาน</label>
-        <input type="time" id="stopTime" value="07:00">
+        <div class="control-group">
+            <label for="stopTime">เวลาเริ่มปิดใช้งาน</label>
+            <input type="time" id="stopTime" value="07:00">
+        </div>
 
         <button onclick="sendConfig()">บันทึกการตั้งค่าลงเครื่อง</button>
     </div>
@@ -67,8 +225,9 @@
 
     // เมื่อการเชื่อมต่อหลุด
     client.onConnectionLost = (responseObject) => {
-        document.getElementById('status-label').innerText = "เชื่อมต่อหลุด! กำลังลองใหม่...";
-        document.getElementById('status-label').style.color = "red";
+        const statusLabel = document.getElementById('status-label');
+        statusLabel.innerHTML = "<span>⚠️</span> เชื่อมต่อหลุด! กำลังลองใหม่...";
+        statusLabel.style.color = "#e74c3c";
         setTimeout(connect, 5000);
     };
 
@@ -77,26 +236,36 @@
         console.log("Received: " + message.payloadString);
         try {
             const data = JSON.parse(message.payloadString);
-            document.getElementById('temp').innerText = data.temp.toFixed(1);
+            
+            // แสดงอุณหภูมิ พร้อม Animation เล็กน้อย (ถ้าต้องการ)
+            const tempElem = document.getElementById('temp');
+            tempElem.innerText = data.temp.toFixed(1);
+
             const isRelayOn = data.relay;
             const relayElem = document.getElementById('relay');
             relayElem.innerText = isRelayOn ? "ทำงาน (ON)" : "หยุด (OFF)";
-            relayElem.style.color = isRelayOn ? "#28a745" : "#d93025";
+            relayElem.style.color = isRelayOn ? "#2ecc71" : "#e74c3c"; // ใช้สีจาก var()
+
         } catch (e) {
             console.error("JSON Parse Error", e);
         }
     };
 
     function connect() {
+        const statusLabel = document.getElementById('status-label');
+        statusLabel.innerHTML = "<span>⏳</span> กำลังเชื่อมต่อ Server...";
+        statusLabel.style.color = "#7f8c8d";
+
         const options = {
-            useSSL: true, // เปิดการใช้งาน SSL เพื่อให้รันบน GitHub Pages ได้
+            useSSL: true, 
             onSuccess: () => {
-                document.getElementById('status-label').innerText = "เชื่อมต่อออนไลน์แล้ว ✅";
-                document.getElementById('status-label').style.color = "green";
+                statusLabel.innerHTML = "<span>✅</span> เชื่อมต่อออนไลน์แล้ว";
+                statusLabel.style.color = "#2ecc71";
                 client.subscribe(topicStatus);
             },
             onFailure: (err) => {
-                document.getElementById('status-label').innerText = "เชื่อมต่อไม่สำเร็จ: " + err.errorMessage;
+                statusLabel.innerHTML = "<span>❌</span> เชื่อมต่อไม่สำเร็จ: " + err.errorMessage;
+                statusLabel.style.color = "#e74c3c";
                 setTimeout(connect, 5000);
             }
         };
@@ -117,6 +286,8 @@
         const message = new Paho.MQTT.Message(JSON.stringify(config));
         message.destinationName = topicControl;
         client.send(message);
+        
+        // ใช้ Alert แบบเรียบง่าย หรือจะทำ Notification เองก็ได้
         alert("ส่งข้อมูลการตั้งค่าสำเร็จ!");
     }
 
