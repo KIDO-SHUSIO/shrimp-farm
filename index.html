@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shrimp Farm Online Control</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; background: #eef2f7; margin: 0; padding: 20px; }
+        .container { background: white; max-width: 500px; margin: auto; padding: 30px; border-radius: 25px; box-shadow: 0 15px 35px rgba(0,0,0,0.1); }
+        h1 { color: #2c3e50; }
+        .status-card { background: #f8f9fa; padding: 20px; border-radius: 15px; margin-bottom: 20px; border-left: 5px solid #3498db; }
+        .temp-display { font-size: 3.5rem; font-weight: bold; color: #e74c3c; margin: 10px 0; }
+        .input-group { text-align: left; margin-top: 20px; padding-top: 15px; border-top: 1px solid #eee; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; color: #555; }
+        input { width: 100%; padding: 12px; margin-bottom: 15px; border-radius: 8px; border: 1px solid #ddd; box-sizing: border-box; font-size: 1rem; }
+        button { background: #3498db; color: white; border: none; padding: 15px; width: 100%; border-radius: 10px; cursor: pointer; font-size: 1.1rem; transition: 0.3s; }
+        button:hover { background: #2980b9; }
+        #conn-status { font-size: 0.8rem; color: #7f8c8d; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Shrimp Online</h1>
+    <div id="conn-status">กำลังเชื่อมต่อ Server...</div>
+    
+    <div class="status-card">
+        <div>อุณหภูมิปัจจุบัน</div>
+        <div class="temp-display"><span id="txt-temp">--.--</span>°C</div>
+        <div>สถานะรีเลย์: <span id="txt-relay" style="font-weight:bold;">รอข้อมูล...</span></div>
+    </div>
+
+    <div class="input-group">
+        <label>ตั้งอุณหภูมิเปิด (>=):</label>
+        <input type="number" id="in-temp" step="0.1" value="32.0">
+        
+        <label>เวลาเริ่มเปิด (HH:mm):</label>
+        <input type="time" id="in-start" value="22:00">
+        
+        <label>เวลาเริ่มปิด (HH:mm):</label>
+        <input type="time" id="in-stop" value="07:00">
+        
+        <button onclick="sendSettings()">บันทึกการตั้งค่าลง ESP32</button>
+    </div>
+</div>
+
+<script>
+    // --- ตั้งค่า MQTT (ใช้ HiveMQ Public Broker) ---
+    const broker = "broker.hivemq.com";
+    const port = 8000; // WebSocket port
+    const clientId = "web_shrimp_" + Math.random().toString(16).substr(2, 8);
+    const topicStatus = "shrimp/status";    // ESP32 ส่งมา
+    const topicControl = "shrimp/control";  // เว็บส่งไป
+
+    const client = new Paho.MQTT.Client(broker, port, clientId);
+
+    client.onConnectionLost = (resp) => { 
+        document.getElementById('conn-status').innerText = "การเชื่อมต่อหลุด! กำลังลองใหม่...";
+        setTimeout(connect, 5000);
+    };
+
+    client.onMessageArrived = (msg) => {
+        const data = JSON.parse(msg.payloadString);
+        document.getElementById('txt-temp').innerText = data.temp.toFixed(2);
+        document.getElementById('txt-relay').innerText = data.relay ? "เปิด (ON)" : "ปิด (OFF)";
+        document.getElementById('txt-relay').style.color = data.relay ? "green" : "red";
+    };
+
+    function connect() {
+        client.connect({ onSuccess: () => {
+            document.getElementById('conn-status').innerText = "เชื่อมต่อออนไลน์แล้ว ✅";
+            client.subscribe(topicStatus);
+        }, useSSL: false });
+    }
+
+    function sendSettings() {
+        const payload = JSON.stringify({
+            maxT: parseFloat(document.getElementById('in-temp').value),
+            start: document.getElementById('in-start').value,
+            stop: document.getElementById('in-stop').value
+        });
+        const message = new Paho.MQTT.Message(payload);
+        message.destinationName = topicControl;
+        client.send(message);
+        alert("ส่งการตั้งค่าแล้ว!");
+    }
+
+    connect();
+</script>
+
+</body>
+</html>
